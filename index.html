@@ -2,265 +2,250 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>シンプルメモ</title>
+  <title>ローカルメモアプリ</title>
   <style>
     body {
-      font-family: system-ui, sans-serif;
-      margin: 2rem;
-      background-color: #f5f5f5;
-      color: #222;
+      font-family: "Helvetica", sans-serif;
+      background-color: #fafafa;
+      margin: 0;
+      padding: 1rem;
+      color: #333;
     }
-
-    h1 {
-      font-size: 1.5rem;
+    header {
       margin-bottom: 1rem;
-    }
-
-    #controls {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin: 0;
+    }
+    #feedSelector {
+      padding: 0.25rem;
+    }
+    #controls, #filterArea {
+      display: flex;
+      gap: 1rem;
       margin-bottom: 1rem;
+      flex-wrap: wrap;
     }
-
-    #controls input, #controls select, button {
-      padding: 0.5rem;
-      font-size: 0.9rem;
-    }
-
-    #notes {
+    #noteList {
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      margin-bottom: 2rem;
     }
-
     .note {
-      background: white;
+      background: #fff;
       border: 1px solid #ddd;
-      border-left: 5px solid #ccc;
-      padding: 0.8rem;
-      border-radius: 6px;
+      border-radius: 0.5rem;
+      padding: 1rem;
       position: relative;
     }
-
-    .note .header {
-      font-size: 0.85rem;
-      color: #666;
-      margin-bottom: 0.5rem;
-    }
-
-    .note .id {
-      font-weight: bold;
-      color: #999;
-    }
-
-    .note .hashtags {
-      color: #0077cc;
-      margin-top: 0.3rem;
-    }
-
-    .note .quote {
-      border-left: 3px solid #ccc;
-      margin: 0.5rem 0;
-      padding-left: 0.5rem;
-      font-style: italic;
-      color: #444;
-      background: #f8f8f8;
-    }
-
-    .note .actions {
+    .note .meta {
       font-size: 0.8rem;
+      color: #777;
       margin-top: 0.5rem;
     }
-
-    .note .actions span {
-      margin-right: 1rem;
+    .note .quote {
+      font-style: italic;
+      color: #555;
+      margin-top: 0.5rem;
+    }
+    .note .tree-indent {
+      margin-left: 1.5rem;
+      border-left: 2px dotted #ccc;
+      padding-left: 1rem;
+    }
+    .note .button {
       cursor: pointer;
-      color: #666;
-    }
-
-    .note .collapsed {
-      max-height: 3.6em;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .note .expand-btn {
       font-size: 0.8rem;
-      color: #0077cc;
+      margin-left: 1rem;
+      color: #007acc;
+    }
+    .note .delete {
+      color: red;
+      position: absolute;
+      top: 0.5rem;
+      right: 1rem;
       cursor: pointer;
     }
-
-    #inputArea {
-      margin-top: 2rem;
+    #addNoteSection {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
       border-top: 1px solid #ccc;
-      padding-top: 1rem;
+      padding: 1rem;
+      box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
     }
-
-    textarea {
+    #noteInput {
       width: 100%;
-      height: 4rem;
-      padding: 0.5rem;
       font-size: 1rem;
-      margin-bottom: 0.5rem;
+      padding: 0.5rem;
     }
-
-    #importExport {
-      margin-top: 1rem;
+    button {
+      font-size: 1rem;
+      padding: 0.5rem;
     }
   </style>
 </head>
 <body>
-  <h1>メモ帳（ローカル保存）</h1>
+  <header>
+    <h1>メモアプリ</h1>
+    <select id="feedSelector" onchange="switchFeed(this.value)">
+      <option value="default">デフォルトフィード</option>
+      <option value="work">仕事</option>
+      <option value="personal">個人</option>
+    </select>
+  </header>
+
   <div id="controls">
-    <select id="sortSelect" onchange="renderNotes()">
+    <select id="sortSelect" onchange="renderNotes()"> 
       <option value="newest">新しい順</option>
       <option value="oldest">古い順</option>
     </select>
-    <input type="text" id="searchInput" placeholder="検索..." oninput="renderNotes()">
-    <input type="text" id="tagFilter" placeholder="#タグ絞り込み..." oninput="renderNotes()">
-    <input type="date" id="dateFilter" onchange="renderNotes()">
-    <button onclick="exportNotes()">📤 エクスポート</button>
-    <input type="file" id="importInput" onchange="importNotes()" />
+    <input type="date" id="dateFilter" onchange="renderNotes()" />
+    <input type="text" id="tagFilter" placeholder="#タグで絞り込み" oninput="renderNotes()" />
+    <input type="text" id="searchInput" placeholder="検索..." oninput="renderNotes()" />
+    <button onclick="exportNotes()">エクスポート</button>
+    <button onclick="importNotes()">インポート</button>
+    <input type="file" id="fileInput" style="display:none" />
   </div>
 
-  <div id="notes"></div>
+  <div id="noteList"></div>
 
-  <div id="inputArea">
-    <textarea id="noteInput" placeholder="メモを書く... #タグ >>ID @スレッド"></textarea>
-    <textarea id="noteDetailInput" placeholder="補足情報（任意）"></textarea>
+  <div id="addNoteSection">
+    <input type="text" id="noteInput" placeholder="メモを書く... #タグ >>ID @スレッド">
     <button onclick="addNote()">追加</button>
   </div>
 
   <script>
-    let notes = JSON.parse(localStorage.getItem('notes')) || [];
-    let nextId = notes.reduce((max, note) => Math.max(max, note?.id || 0), 0) + 1;
+    let notes = [];
+    let nextId = 0;
+    let currentFeed = 'default';
 
-    function saveNotes() {
-      localStorage.setItem('notes', JSON.stringify(notes));
-    }
-
-    function addNote() {
-      const text = document.getElementById('noteInput').value.trim();
-      const detail = document.getElementById('noteDetailInput').value.trim();
+    function addNote(replyTo = null) {
+      const input = document.getElementById('noteInput');
+      const text = input.value.trim();
       if (!text) return;
 
-      const timestamp = new Date().toISOString();
       const hashtags = text.match(/#\w+/g) || [];
-      const quoteMatch = text.match(/>>(\d+)/);
-      const thread = (text.match(/@[\w\-]+/) || [])[0] || '';
+      const quoteMatch = text.match(/>>\d+/);
+      const thread = (text.match(/@\w+/) || [])[0] || '';
 
-      const note = {
+      notes.push({
         id: nextId++,
         text,
-        detail,
-        timestamp,
         hashtags,
-        quoteId: quoteMatch ? parseInt(quoteMatch[1]) : null,
+        timestamp: new Date().toISOString(),
+        quoteId: quoteMatch ? parseInt(quoteMatch[0].slice(2)) : null,
         thread,
         favorite: false,
-      };
-      notes.unshift(note);
-      saveNotes();
-      document.getElementById('noteInput').value = '';
-      document.getElementById('noteDetailInput').value = '';
+        deleted: false,
+        parentId: replyTo,
+        feed: currentFeed
+      });
+      input.value = '';
       renderNotes();
-    }
-
-    function deleteNote(id) {
-      if (!confirm(`メモ ID:${id} を削除しますか？`)) return;
-      notes = notes.map(n => (n && n.id === id ? null : n));
-      saveNotes();
-      renderNotes();
-    }
-
-    function toggleFavorite(id) {
-      const note = notes.find(n => n && n.id === id);
-      if (note) {
-        note.favorite = !note.favorite;
-        saveNotes();
-        renderNotes();
-      }
     }
 
     function renderNotes() {
-      const container = document.getElementById('notes');
-      container.innerHTML = '';
+      const container = document.getElementById('noteList');
       const search = document.getElementById('searchInput').value.toLowerCase();
       const sort = document.getElementById('sortSelect').value;
-      const tagFilter = document.getElementById('tagFilter').value.toLowerCase();
-      const dateFilter = document.getElementById('dateFilter').value;
+      const tag = document.getElementById('tagFilter').value.toLowerCase();
+      const date = document.getElementById('dateFilter').value;
+      container.innerHTML = '';
 
-      const filtered = notes.filter(n => n && (
-        (!search || n.text.toLowerCase().includes(search) || (n.detail || '').toLowerCase().includes(search)) &&
-        (!tagFilter || n.hashtags.some(h => h.toLowerCase().includes(tagFilter))) &&
-        (!dateFilter || n.timestamp.startsWith(dateFilter))
-      ));
+      let filtered = notes.filter(n => !n.deleted && n.feed === currentFeed);
 
-      const sorted = sort === 'oldest' ? [...filtered].reverse() : filtered;
+      if (search) {
+        filtered = filtered.filter(n => n.text.toLowerCase().includes(search));
+      }
+      if (tag) {
+        filtered = filtered.filter(n => n.hashtags.some(h => h.toLowerCase().includes(tag)));
+      }
+      if (date) {
+        filtered = filtered.filter(n => n.timestamp.startsWith(date));
+      }
 
-      for (const note of sorted) {
+      filtered.sort((a, b) => {
+        return sort === 'oldest' ? a.id - b.id : b.id - a.id;
+      });
+
+      for (const note of filtered) {
         const div = document.createElement('div');
         div.className = 'note';
-
-        const quote = note.quoteId !== null && notes.find(n => n && n.id === note.quoteId);
-        const quoteHtml = quote ? `<div class="quote">>>${quote.id}: ${quote.text}</div>` : '';
-
-        const mainText = note.text.length > 120 ? 
-          `<div class="collapsed" id="text-${note.id}">${note.text}</div><div class="expand-btn" onclick="expandNote(${note.id})">全文を表示</div>` : 
-          `<div>${note.text}</div>`;
-
+        const quote = note.quoteId !== null ? notes.find(n => n.id === note.quoteId)?.text || '' : '';
+        const indentLevel = getIndentLevel(note);
         div.innerHTML = `
-          <div class="header">
-            <span class="id">ID: ${note.id}</span> | 
-            <span>${new Date(note.timestamp).toLocaleString()} ${note.thread}</span>
-          </div>
-          ${quoteHtml}
-          ${mainText}
-          ${note.detail ? `<div style="margin-top:0.3rem; color:#555;"><em>${note.detail}</em></div>` : ''}
-          <div class="hashtags">${note.hashtags.join(' ')}</div>
-          <div class="actions">
-            <span onclick="toggleFavorite(${note.id})">${note.favorite ? '★ おきにいり' : '☆ おきにいり'}</span>
-            <span onclick="deleteNote(${note.id})">🗑 削除</span>
-          </div>
+          <div class="delete" onclick="deleteNote(${note.id})">✕</div>
+          ${quote ? `<div class="quote">引用 >>${note.quoteId}: ${quote}</div>` : ''}
+          <div class="tree-indent" style="margin-left:${indentLevel * 2}rem">${note.text}</div>
+          <div class="meta">ID:${note.id} ${new Date(note.timestamp).toLocaleString()} ${note.thread}</div>
+          <div class="meta">タグ: ${note.hashtags.join(' ')}</div>
+          <span class="button" onclick="addReply(${note.id})">補足</span>
         `;
-
         container.appendChild(div);
       }
     }
 
-    function expandNote(id) {
-      const el = document.getElementById('text-' + id);
-      if (el) {
-        el.classList.remove('collapsed');
-        el.nextElementSibling.remove();
+    function getIndentLevel(note, level = 0) {
+      const parent = notes.find(n => n.id === note.parentId);
+      return parent ? getIndentLevel(parent, level + 1) : level;
+    }
+
+    function addReply(id) {
+      const replyText = prompt("補足を入力:");
+      if (replyText) {
+        document.getElementById("noteInput").value = replyText + ` >>${id}`;
+        addNote(id);
+      }
+    }
+
+    function deleteNote(id) {
+      if (confirm("本当に削除しますか？")) {
+        const note = notes.find(n => n.id === id);
+        if (note) note.deleted = true;
+        renderNotes();
       }
     }
 
     function exportNotes() {
-      const blob = new Blob([JSON.stringify(notes)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(notes)], {type: "application/json"});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = 'notes.json';
+      a.download = "notes.json";
       a.click();
     }
 
     function importNotes() {
-      const file = document.getElementById('importInput').files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const imported = JSON.parse(e.target.result);
-        notes = imported.filter(n => n); // null 削除
-        nextId = notes.reduce((max, n) => Math.max(max, n.id), 0) + 1;
-        saveNotes();
-        renderNotes();
+      document.getElementById('fileInput').click();
+      document.getElementById('fileInput').onchange = function(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function() {
+          try {
+            const imported = JSON.parse(reader.result);
+            notes = imported;
+            nextId = Math.max(...notes.map(n => n.id)) + 1;
+            renderNotes();
+          } catch (e) {
+            alert("読み込みに失敗しました");
+          }
+        };
+        reader.readAsText(file);
       };
-      reader.readAsText(file);
     }
 
-    renderNotes();
+    function switchFeed(feedName) {
+      currentFeed = feedName;
+      renderNotes();
+    }
   </script>
 </body>
 </html>
