@@ -1,251 +1,214 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>ローカルメモアプリ</title>
+  <meta charset="UTF-8">
+  <title>メモ帳アプリ</title>
   <style>
     body {
-      font-family: "Helvetica", sans-serif;
-      background-color: #fafafa;
-      margin: 0;
-      padding: 1rem;
-      color: #333;
-    }
-    header {
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      font-family: sans-serif;
+      margin: 1rem;
+      background-color: #fefefe;
+      color: #222;
     }
     h1 {
-      font-size: 1.2rem;
-      margin: 0;
-    }
-    #feedSelector {
-      padding: 0.25rem;
-    }
-    #controls, #filterArea {
-      display: flex;
-      gap: 1rem;
+      font-size: 1.4rem;
       margin-bottom: 1rem;
-      flex-wrap: wrap;
     }
-    #noteList {
+    #controls, #feedControls {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+    input[type="text"], select {
+      padding: 0.4rem;
+      font-size: 1rem;
+      flex: 1;
+    }
+    button {
+      padding: 0.4rem 1rem;
+      font-size: 1rem;
+    }
+    #notes {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.5rem;
       margin-bottom: 2rem;
     }
     .note {
       background: #fff;
       border: 1px solid #ddd;
-      border-radius: 0.5rem;
-      padding: 1rem;
+      border-radius: 0.25rem;
+      padding: 0.5rem;
       position: relative;
     }
-    .note .meta {
-      font-size: 0.8rem;
-      color: #777;
-      margin-top: 0.5rem;
+    .note-id {
+      font-size: 0.75rem;
+      color: #888;
     }
-    .note .quote {
-      font-style: italic;
-      color: #555;
-      margin-top: 0.5rem;
+    .timestamp {
+      font-size: 0.75rem;
+      color: #aaa;
     }
-    .note .tree-indent {
-      margin-left: 1.5rem;
-      border-left: 2px dotted #ccc;
-      padding-left: 1rem;
+    .hashtags {
+      color: #0057aa;
     }
-    .note .button {
-      cursor: pointer;
-      font-size: 0.8rem;
-      margin-left: 1rem;
-      color: #007acc;
-    }
-    .note .delete {
-      color: red;
+    .delete-button {
       position: absolute;
-      top: 0.5rem;
-      right: 1rem;
+      top: 5px;
+      right: 10px;
+      color: red;
       cursor: pointer;
     }
-    #addNoteSection {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border-top: 1px solid #ccc;
-      padding: 1rem;
-      box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+    .favorite {
+      color: goldenrod;
+      cursor: pointer;
+      font-size: 0.9rem;
     }
-    #noteInput {
-      width: 100%;
-      font-size: 1rem;
-      padding: 0.5rem;
-    }
-    button {
-      font-size: 1rem;
-      padding: 0.5rem;
+    .quote {
+      font-style: italic;
+      color: #666;
+      margin-top: 0.25rem;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>メモアプリ</h1>
-    <select id="feedSelector" onchange="switchFeed(this.value)">
-      <option value="default">デフォルトフィード</option>
-      <option value="work">仕事</option>
-      <option value="personal">個人</option>
-    </select>
-  </header>
+  <h1>メモ帳アプリ（オフライン対応）</h1>
+
+  <div id="feedControls">
+    <select id="feedSelect" onchange="handleFeedChange()"></select>
+    <input type="text" id="newFeedInput" placeholder="新しいフィード名">
+    <button onclick="addFeed()">＋</button>
+  </div>
 
   <div id="controls">
-    <select id="sortSelect" onchange="renderNotes()"> 
+    <select id="sortSelect" onchange="renderNotes()">
       <option value="newest">新しい順</option>
       <option value="oldest">古い順</option>
     </select>
-    <input type="date" id="dateFilter" onchange="renderNotes()" />
-    <input type="text" id="tagFilter" placeholder="#タグで絞り込み" oninput="renderNotes()" />
-    <input type="text" id="searchInput" placeholder="検索..." oninput="renderNotes()" />
-    <button onclick="exportNotes()">エクスポート</button>
-    <button onclick="importNotes()">インポート</button>
-    <input type="file" id="fileInput" style="display:none" />
+    <input type="text" id="searchInput" placeholder="検索..." oninput="renderNotes()">
   </div>
 
-  <div id="noteList"></div>
+  <div id="notes"></div>
 
-  <div id="addNoteSection">
-    <input type="text" id="noteInput" placeholder="メモを書く... #タグ >>ID @スレッド">
+  <div id="inputArea">
+    <input type="text" id="noteInput" placeholder="メモを書く... #タグ >>ID @カテゴリ">
     <button onclick="addNote()">追加</button>
   </div>
 
   <script>
     let notes = [];
     let nextId = 0;
+    let feeds = ['default'];
     let currentFeed = 'default';
 
-    function addNote(replyTo = null) {
+    function addNote() {
       const input = document.getElementById('noteInput');
       const text = input.value.trim();
       if (!text) return;
 
+      const timestamp = new Date().toLocaleString();
       const hashtags = text.match(/#\w+/g) || [];
       const quoteMatch = text.match(/>>\d+/);
-      const thread = (text.match(/@\w+/) || [])[0] || '';
+      const category = (text.match(/@\w+/) || [])[0]?.slice(1) || '';
 
-      notes.push({
+      const note = {
         id: nextId++,
         text,
         hashtags,
-        timestamp: new Date().toISOString(),
+        timestamp,
         quoteId: quoteMatch ? parseInt(quoteMatch[0].slice(2)) : null,
-        thread,
+        category,
         favorite: false,
-        deleted: false,
-        parentId: replyTo,
         feed: currentFeed
-      });
+      };
+
+      notes.unshift(note);
       input.value = '';
       renderNotes();
     }
 
-    function renderNotes() {
-      const container = document.getElementById('noteList');
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const sort = document.getElementById('sortSelect').value;
-      const tag = document.getElementById('tagFilter').value.toLowerCase();
-      const date = document.getElementById('dateFilter').value;
-      container.innerHTML = '';
-
-      let filtered = notes.filter(n => !n.deleted && n.feed === currentFeed);
-
-      if (search) {
-        filtered = filtered.filter(n => n.text.toLowerCase().includes(search));
-      }
-      if (tag) {
-        filtered = filtered.filter(n => n.hashtags.some(h => h.toLowerCase().includes(tag)));
-      }
-      if (date) {
-        filtered = filtered.filter(n => n.timestamp.startsWith(date));
-      }
-
-      filtered.sort((a, b) => {
-        return sort === 'oldest' ? a.id - b.id : b.id - a.id;
-      });
-
-      for (const note of filtered) {
-        const div = document.createElement('div');
-        div.className = 'note';
-        const quote = note.quoteId !== null ? notes.find(n => n.id === note.quoteId)?.text || '' : '';
-        const indentLevel = getIndentLevel(note);
-        div.innerHTML = `
-          <div class="delete" onclick="deleteNote(${note.id})">✕</div>
-          ${quote ? `<div class="quote">引用 >>${note.quoteId}: ${quote}</div>` : ''}
-          <div class="tree-indent" style="margin-left:${indentLevel * 2}rem">${note.text}</div>
-          <div class="meta">ID:${note.id} ${new Date(note.timestamp).toLocaleString()} ${note.thread}</div>
-          <div class="meta">タグ: ${note.hashtags.join(' ')}</div>
-          <span class="button" onclick="addReply(${note.id})">補足</span>
-        `;
-        container.appendChild(div);
-      }
-    }
-
-    function getIndentLevel(note, level = 0) {
-      const parent = notes.find(n => n.id === note.parentId);
-      return parent ? getIndentLevel(parent, level + 1) : level;
-    }
-
-    function addReply(id) {
-      const replyText = prompt("補足を入力:");
-      if (replyText) {
-        document.getElementById("noteInput").value = replyText + ` >>${id}`;
-        addNote(id);
-      }
-    }
-
-    function deleteNote(id) {
-      if (confirm("本当に削除しますか？")) {
-        const note = notes.find(n => n.id === id);
-        if (note) note.deleted = true;
+    function toggleFavorite(id) {
+      const note = notes.find(n => n && n.id === id);
+      if (note) {
+        note.favorite = !note.favorite;
         renderNotes();
       }
     }
 
-    function exportNotes() {
-      const blob = new Blob([JSON.stringify(notes)], {type: "application/json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "notes.json";
-      a.click();
-    }
-
-    function importNotes() {
-      document.getElementById('fileInput').click();
-      document.getElementById('fileInput').onchange = function(event) {
-        const file = event.target.files[0];
-        const reader = new FileReader();
-        reader.onload = function() {
-          try {
-            const imported = JSON.parse(reader.result);
-            notes = imported;
-            nextId = Math.max(...notes.map(n => n.id)) + 1;
-            renderNotes();
-          } catch (e) {
-            alert("読み込みに失敗しました");
-          }
-        };
-        reader.readAsText(file);
-      };
-    }
-
-    function switchFeed(feedName) {
-      currentFeed = feedName;
+    function deleteNote(id) {
+      if (!confirm('本当に削除しますか？')) return;
+      notes = notes.map(n => (n && n.id === id ? null : n));
       renderNotes();
     }
+
+    function renderNotes() {
+      const container = document.getElementById('notes');
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const sort = document.getElementById('sortSelect').value;
+      container.innerHTML = '';
+
+      const filtered = notes.filter(n => n && n.feed === currentFeed && (
+        n.text.toLowerCase().includes(search) ||
+        n.hashtags.some(h => h.toLowerCase().includes(search))
+      ));
+
+      const sorted = sort === 'oldest' ? [...filtered].reverse() : filtered;
+
+      for (const note of sorted) {
+        const div = document.createElement('div');
+        div.className = 'note';
+        const quote = note.quoteId !== null && notes[note.quoteId] ? `
+          <div class="quote">引用 >>${note.quoteId}: ${notes[note.quoteId].text}</div>
+        ` : '';
+
+        div.innerHTML = `
+          <div class="note-id">ID: ${note.id}</div>
+          <div class="delete-button" onclick="deleteNote(${note.id})">✕</div>
+          <div>${note.text}</div>
+          ${quote}
+          <div class="timestamp">${note.timestamp} ${note.category ? '｜ ' + note.category : ''}</div>
+          <div class="hashtags">${note.hashtags.join(' ')}</div>
+          <div class="favorite" onclick="toggleFavorite(${note.id})">
+            ${note.favorite ? '★ おきにいり' : '☆ おきにいり'}
+          </div>
+        `;
+
+        container.appendChild(div);
+      }
+    }
+
+    function addFeed() {
+      const input = document.getElementById('newFeedInput');
+      const newFeed = input.value.trim();
+      if (newFeed && !feeds.includes(newFeed)) {
+        feeds.push(newFeed);
+        updateFeedSelect();
+        input.value = '';
+      }
+    }
+
+    function updateFeedSelect() {
+      const select = document.getElementById('feedSelect');
+      select.innerHTML = '';
+      for (const feed of feeds) {
+        const option = document.createElement('option');
+        option.value = feed;
+        option.textContent = feed;
+        if (feed === currentFeed) option.selected = true;
+        select.appendChild(option);
+      }
+    }
+
+    function handleFeedChange() {
+      const select = document.getElementById('feedSelect');
+      currentFeed = select.value;
+      renderNotes();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateFeedSelect();
+    });
   </script>
 </body>
 </html>
