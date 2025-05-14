@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>メモ帳アプリ</title>
+  <title>メモ帳</title>
   <style>
     body {
       font-family: sans-serif;
@@ -73,7 +73,7 @@
   </style>
 </head>
 <body>
-  <h1>メモ帳アプリ（オフライン対応）</h1>
+  <h1>メモ帳</h1>
 
   <div id="feedControls">
     <select id="feedSelect" onchange="handleFeedChange()"></select>
@@ -137,7 +137,7 @@
     }
 
     function deleteNote(id) {
-      if (!confirm('本当に削除しますか？')) return;
+      if (!confirm('削除しますか？')) return;
       notes = notes.map(n => (n && n.id === id ? null : n));
       renderNotes();
     }
@@ -170,7 +170,7 @@
           <div class="timestamp">${note.timestamp} ${note.category ? '｜ ' + note.category : ''}</div>
           <div class="hashtags">${note.hashtags.join(' ')}</div>
           <div class="favorite" onclick="toggleFavorite(${note.id})">
-            ${note.favorite ? '★ おきにいり' : '☆ おきにいり'}
+            ${note.favorite ? '★ お気に入り' : '☆ お気に入り'}
           </div>
         `;
 
