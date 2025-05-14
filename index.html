@@ -2,56 +2,75 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>メモ帳</title>
+  <title>メモ</title>
   <style>
     body {
       font-family: sans-serif;
-      margin: 1rem;
-      background-color: #fefefe;
-      color: #222;
+      margin: 2rem;
+      background-color: #f9f9f9;
     }
     h1 {
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       margin-bottom: 1rem;
     }
-    #controls, #feedControls {
+    #inputArea {
       display: flex;
+      flex-direction: column;
       gap: 0.5rem;
-      margin-bottom: 1rem;
-      align-items: center;
+      margin-top: 2rem;
     }
-    input[type="text"], select {
-      padding: 0.4rem;
+    textarea {
+      width: 100%;
+      min-height: 6rem;
+      padding: 1rem;
       font-size: 1rem;
-      flex: 1;
+      resize: vertical;
+      box-sizing: border-box;
     }
     button {
-      padding: 0.4rem 1rem;
+      padding: 0.5rem 1rem;
       font-size: 1rem;
+    }
+    #controls {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
     #notes {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
-      margin-bottom: 2rem;
     }
     .note {
       background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 0.25rem;
-      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
       position: relative;
     }
     .note-id {
       font-size: 0.75rem;
-      color: #888;
+      color: #aaa;
+      margin-bottom: 0.25rem;
     }
     .timestamp {
-      font-size: 0.75rem;
-      color: #aaa;
+      font-size: 0.8rem;
+      color: #888;
     }
     .hashtags {
-      color: #0057aa;
+      color: #0077cc;
+    }
+    .favorite {
+      color: gold;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .quote {
+      font-style: italic;
+      color: #555;
+      margin-top: 0.25rem;
     }
     .delete-button {
       position: absolute;
@@ -60,27 +79,10 @@
       color: red;
       cursor: pointer;
     }
-    .favorite {
-      color: goldenrod;
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-    .quote {
-      font-style: italic;
-      color: #666;
-      margin-top: 0.25rem;
-    }
   </style>
 </head>
 <body>
-  <h1>メモ帳</h1>
-
-  <div id="feedControls">
-    <select id="feedSelect" onchange="handleFeedChange()"></select>
-    <input type="text" id="newFeedInput" placeholder="新しいフィード名">
-    <button onclick="addFeed()">＋</button>
-  </div>
-
+  <h1>メモ</h1>
   <div id="controls">
     <select id="sortSelect" onchange="renderNotes()">
       <option value="newest">新しい順</option>
@@ -88,19 +90,15 @@
     </select>
     <input type="text" id="searchInput" placeholder="検索..." oninput="renderNotes()">
   </div>
-
   <div id="notes"></div>
-
   <div id="inputArea">
-    <input type="text" id="noteInput" placeholder="メモを書く... #タグ >>ID @カテゴリ">
+    <textarea id="noteInput" placeholder="メモを追加... #タグ >>ID @スレッド"></textarea>
     <button onclick="addNote()">追加</button>
   </div>
 
   <script>
     let notes = [];
     let nextId = 0;
-    let feeds = ['default'];
-    let currentFeed = 'default';
 
     function addNote() {
       const input = document.getElementById('noteInput');
@@ -110,7 +108,7 @@
       const timestamp = new Date().toLocaleString();
       const hashtags = text.match(/#\w+/g) || [];
       const quoteMatch = text.match(/>>\d+/);
-      const category = (text.match(/@\w+/) || [])[0]?.slice(1) || '';
+      const thread = (text.match(/@\w+/) || [])[0] || '';
 
       const note = {
         id: nextId++,
@@ -118,11 +116,9 @@
         hashtags,
         timestamp,
         quoteId: quoteMatch ? parseInt(quoteMatch[0].slice(2)) : null,
-        category,
+        thread,
         favorite: false,
-        feed: currentFeed
       };
-
       notes.unshift(note);
       input.value = '';
       renderNotes();
@@ -137,7 +133,7 @@
     }
 
     function deleteNote(id) {
-      if (!confirm('削除しますか？')) return;
+      if (!confirm('このメモを削除しますか？')) return;
       notes = notes.map(n => (n && n.id === id ? null : n));
       renderNotes();
     }
@@ -148,7 +144,7 @@
       const sort = document.getElementById('sortSelect').value;
       container.innerHTML = '';
 
-      const filtered = notes.filter(n => n && n.feed === currentFeed && (
+      const filtered = notes.filter(n => n && (
         n.text.toLowerCase().includes(search) ||
         n.hashtags.some(h => h.toLowerCase().includes(search))
       ));
@@ -158,8 +154,8 @@
       for (const note of sorted) {
         const div = document.createElement('div');
         div.className = 'note';
-        const quote = note.quoteId !== null && notes[note.quoteId] ? `
-          <div class="quote">引用 >>${note.quoteId}: ${notes[note.quoteId].text}</div>
+        const quote = note.quoteId !== null && notes.find(n => n && n.id === note.quoteId) ? `
+          <div class="quote">引用 >>${note.quoteId}: ${notes.find(n => n && n.id === note.quoteId).text}</div>
         ` : '';
 
         div.innerHTML = `
@@ -167,7 +163,7 @@
           <div class="delete-button" onclick="deleteNote(${note.id})">✕</div>
           <div>${note.text}</div>
           ${quote}
-          <div class="timestamp">${note.timestamp} ${note.category ? '｜ ' + note.category : ''}</div>
+          <div class="timestamp">${note.timestamp} ${note.thread}</div>
           <div class="hashtags">${note.hashtags.join(' ')}</div>
           <div class="favorite" onclick="toggleFavorite(${note.id})">
             ${note.favorite ? '★ お気に入り' : '☆ お気に入り'}
@@ -177,38 +173,6 @@
         container.appendChild(div);
       }
     }
-
-    function addFeed() {
-      const input = document.getElementById('newFeedInput');
-      const newFeed = input.value.trim();
-      if (newFeed && !feeds.includes(newFeed)) {
-        feeds.push(newFeed);
-        updateFeedSelect();
-        input.value = '';
-      }
-    }
-
-    function updateFeedSelect() {
-      const select = document.getElementById('feedSelect');
-      select.innerHTML = '';
-      for (const feed of feeds) {
-        const option = document.createElement('option');
-        option.value = feed;
-        option.textContent = feed;
-        if (feed === currentFeed) option.selected = true;
-        select.appendChild(option);
-      }
-    }
-
-    function handleFeedChange() {
-      const select = document.getElementById('feedSelect');
-      currentFeed = select.value;
-      renderNotes();
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      updateFeedSelect();
-    });
   </script>
 </body>
 </html>
