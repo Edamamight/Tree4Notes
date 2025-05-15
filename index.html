@@ -8,20 +8,44 @@
       font-family: sans-serif;
       margin: 2rem;
       background-color: #f9f9f9;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
     }
     h1 {
       font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    #controls {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    #feedControls {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    #notes {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
       margin-bottom: 1rem;
     }
     #inputArea {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
-      margin-top: 2rem;
+      margin-top: auto;
     }
     textarea {
       width: 100%;
-      min-height: 3rem;
+      min-height: 10rem;
       padding: 1rem;
       font-size: 1rem;
       resize: vertical;
@@ -30,17 +54,6 @@
     button {
       padding: 0.5rem 1rem;
       font-size: 1rem;
-    }
-    #controls {
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    #notes {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
     }
     .note {
       background: #fff;
@@ -83,6 +96,11 @@
 </head>
 <body>
   <h1>メモ</h1>
+  <div id="feedControls">
+    <input type="text" id="feedInput" placeholder="新しいフィード名">
+    <button onclick="createFeed()">フィード作成</button>
+    <select id="feedSelect" onchange="renderNotes()"></select>
+  </div>
   <div id="controls">
     <select id="sortSelect" onchange="renderNotes()">
       <option value="newest">新しい順</option>
@@ -92,13 +110,38 @@
   </div>
   <div id="notes"></div>
   <div id="inputArea">
-    <textarea id="noteInput" placeholder="メモを追加... #タグ >>ID @スレッド"></textarea>
+    <textarea id="noteInput" placeholder="メモを書く... #タグ >>ID @スレッド"></textarea>
     <button onclick="addNote()">追加</button>
   </div>
 
   <script>
     let notes = [];
     let nextId = 0;
+    let feeds = ['default'];
+    let currentFeed = 'default';
+
+    function createFeed() {
+      const name = document.getElementById('feedInput').value.trim();
+      if (name && !feeds.includes(name)) {
+        feeds.push(name);
+        updateFeedSelect();
+        document.getElementById('feedInput').value = '';
+      }
+    }
+
+    function updateFeedSelect() {
+      const select = document.getElementById('feedSelect');
+      select.innerHTML = '';
+      feeds.forEach(feed => {
+        const option = document.createElement('option');
+        option.value = feed;
+        option.textContent = feed;
+        if (feed === currentFeed) option.selected = true;
+        select.appendChild(option);
+      });
+      currentFeed = select.value;
+      renderNotes();
+    }
 
     function addNote() {
       const input = document.getElementById('noteInput');
@@ -118,6 +161,7 @@
         quoteId: quoteMatch ? parseInt(quoteMatch[0].slice(2)) : null,
         thread,
         favorite: false,
+        feed: currentFeed,
       };
       notes.unshift(note);
       input.value = '';
@@ -142,9 +186,10 @@
       const container = document.getElementById('notes');
       const search = document.getElementById('searchInput').value.toLowerCase();
       const sort = document.getElementById('sortSelect').value;
+      currentFeed = document.getElementById('feedSelect').value;
       container.innerHTML = '';
 
-      const filtered = notes.filter(n => n && (
+      const filtered = notes.filter(n => n && n.feed === currentFeed && (
         n.text.toLowerCase().includes(search) ||
         n.hashtags.some(h => h.toLowerCase().includes(search))
       ));
@@ -166,13 +211,15 @@
           <div class="timestamp">${note.timestamp} ${note.thread}</div>
           <div class="hashtags">${note.hashtags.join(' ')}</div>
           <div class="favorite" onclick="toggleFavorite(${note.id})">
-            ${note.favorite ? '★ お気に入り' : '☆ お気に入り'}
+            ${note.favorite ? '★ おきにいり' : '☆ おきにいり'}
           </div>
         `;
 
         container.appendChild(div);
       }
     }
+
+    updateFeedSelect();
   </script>
 </body>
 </html>
